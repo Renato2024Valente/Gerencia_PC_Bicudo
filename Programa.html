@@ -1,0 +1,389 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Sistema de Reserva de Computadores</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+        }
+        .container {
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 20px;
+        }
+        th, td {
+            border: 1px solid #070707;
+            padding: 8px;
+            text-align: center;
+        }
+        th {
+            background-color: #80bbf1;
+        }
+        .reserved {
+            background-color: #ecee72;
+        }
+        .available {
+            background-color: #ee5252;
+            cursor: pointer;
+        }
+        .selected {
+            background-color: #76d7c4;
+        }
+        #loginModal, #reserveModal, #resetModal, #individualReserveModal {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0, 0, 0, 0.5);
+            justify-content: center;
+            align-items: center;
+        }
+        .modal-content {
+            background-color: #fff;
+            padding: 20px;
+            border-radius: 5px;
+        }
+        .reservation-list {
+            margin-top: 20px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Sistema de Reserva de Computadores</h1>
+
+        <h2>Horário de Reservas</h2>
+        <table id="reservationTable">
+            <thead>
+                <tr>
+                    <th>Hora</th>
+                    <th>Segunda</th>
+                    <th>Terça</th>
+                    <th>Quarta</th>
+                    <th>Quinta</th>
+                    <th>Sexta</th>
+                </tr>
+            </thead>
+            <tbody>
+                <!-- Linhas serão inseridas aqui pelo JavaScript -->
+            </tbody>
+        </table>
+        
+        <button onclick="showReserveModal()">Confirmar Reservas Múltiplas</button>
+        <button onclick="showIndividualReserveModal()">Reservar Individualmente</button>
+        <button onclick="showResetModal()">Resetar Reservas</button>
+        <button onclick="generatePDF()">Imprimir Reservas</button>
+
+        <div id="loginModal">
+            <div class="modal-content">
+                <h2>Login para Alterar Reservas</h2>
+                <label for="adminUsername">Usuário:</label>
+                <input type="text" id="adminUsername" name="adminUsername"><br>
+                <label for="adminPassword">Senha:</label>
+                <input type="password" id="adminPassword" name="adminPassword"><br>
+                <button onclick="adminLogin()">Entrar</button>
+            </div>
+        </div>
+
+        <div id="reserveModal">
+            <div class="modal-content">
+                <h2>Reservar Computadores</h2>
+                <label for="professorNameModal">Nome do Professor:</label>
+                <input type="text" id="professorNameModal" name="professorNameModal"><br>
+                <label for="numPCsModal">Número de PCs:</label>
+                <input type="number" id="numPCsModal" name="numPCsModal" min="1" max="20"><br>
+                <button onclick="confirmReservations()">Confirmar</button>
+                <button onclick="closeReserveModal()">Cancelar</button>
+            </div>
+        </div>
+
+        <div id="individualReserveModal">
+            <div class="modal-content">
+                <h2>Reservar Computadores Individualmente</h2>
+                <label for="individualProfessorNameModal">Nome do Professor:</label>
+                <input type="text" id="individualProfessorNameModal" name="individualProfessorNameModal"><br>
+                <label for="individualNumPCsModal">Número de PCs:</label>
+                <input type="number" id="individualNumPCsModal" name="individualNumPCsModal" min="1" max="20"><br>
+                <label for="individualDayModal">Dia:</label>
+                <select id="individualDayModal">
+                    <option value="Segunda">Segunda</option>
+                    <option value="Terça">Terça</option>
+                    <option value="Quarta">Quarta</option>
+                    <option value="Quinta">Quinta</option>
+                    <option value="Sexta">Sexta</option>
+                </select><br>
+                <label for="individualTimeModal">Hora:</label>
+                <select id="individualTimeModal">
+                    <option value="9:00">9:00</option>
+                    <option value="10:00">10:00</option>
+                    <option value="11:00">11:00</option>
+                    <option value="12:00">12:00</option>
+                    <option value="13:00">13:00</option>
+                    <option value="14:00">14:00</option>
+                    <option value="15:00">15:00</option>
+                    <option value="16:00">16:00</option>
+                    <option value="17:00">17:00</option>
+                </select><br>
+                <button onclick="confirmIndividualReservation()">Confirmar</button>
+                <button onclick="closeIndividualReserveModal()">Cancelar</button>
+            </div>
+        </div>
+
+        <div id="resetModal">
+            <div class="modal-content">
+                <h2>Login para Resetar Reservas</h2>
+                <label for="resetUsername">Usuário:</label>
+                <input type="text" id="resetUsername" name="resetUsername"><br>
+                <label for="resetPassword">Senha:</label>
+                <input type="password" id="resetPassword" name="resetPassword"><br>
+                <button onclick="resetLogin()">Entrar</button>
+            </div>
+        </div>
+
+        <div class="reservation-list">
+            <h2>Lista de Reservas</h2>
+            <ul id="reservationList">
+                <!-- Lista de reservas será inserida aqui pelo JavaScript -->
+            </ul>
+        </div>
+    </div>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.3.1/jspdf.umd.min.js"></script>
+    <script>
+        const totalComputers = 20;
+        let availableComputers = totalComputers;
+        const schedule = JSON.parse(localStorage.getItem('schedule')) || {};
+        const adminUsers = {
+            'admin': 'senha123'
+        };
+        let selectedSlots = [];
+
+        const times = ["9:00", "10:00", "11:00", "12:00", "13:00", "14:00", "15:00", "16:00", "17:00"];
+        const days = ["Segunda", "Terça", "Quarta", "Quinta", "Sexta"];
+
+        document.addEventListener("DOMContentLoaded", () => {
+            const tableBody = document.querySelector("#reservationTable tbody");
+            times.forEach(time => {
+                const row = document.createElement("tr");
+                const timeCell = document.createElement("td");
+                timeCell.textContent = time;
+                row.appendChild(timeCell);
+
+                days.forEach(day => {
+                    const cell = document.createElement("td");
+                    cell.classList.add(schedule[`${day} ${time}`] ? "reserved" : "available");
+                    cell.setAttribute("data-time", time);
+                    cell.setAttribute("data-day", day);
+                    if (!schedule[`${day} ${time}`]) {
+                        cell.addEventListener("click", handleCellClick);
+                    } else {
+                        cell.textContent = `${schedule[`${day} ${time}`].professorName} (${schedule[`${day} ${time}`].numPCs} PCs)`;
+                        cell.addEventListener("dblclick", handleCellDoubleClick);
+                    }
+                    row.appendChild(cell);
+                });
+
+                tableBody.appendChild(row);
+            });
+            updateReservationList();
+        });
+
+        function adminLogin() {
+            const username = document.getElementById('adminUsername').value;
+            const password = document.getElementById('adminPassword').value;
+
+            if (adminUsers[username] && adminUsers[username] === password) {
+                localStorage.setItem('adminLoggedIn', true);
+                document.getElementById('loginModal').style.display = 'none';
+            } else {
+                alert('Usuário ou senha incorretos.');
+            }
+        }
+
+        function handleCellClick(event) {
+            const cell = event.target;
+            const time = cell.getAttribute("data-time");
+            const day = cell.getAttribute("data-day");
+            const key = `${day} ${time}`;
+            
+            if (cell.classList.contains("selected")) {
+                cell.classList.remove("selected");
+                selectedSlots = selectedSlots.filter(slot => slot.key !== key);
+            } else {
+                cell.classList.add("selected");
+                selectedSlots.push({ day, time, key });
+            }
+        }
+
+        function handleCellDoubleClick(event) {
+            if (localStorage.getItem('adminLoggedIn')) {
+                const cell = event.target;
+                const time = cell.getAttribute("data-time");
+                const day = cell.getAttribute("data-day");
+                const key = `${day} ${time}`;
+                if (confirm(`Deseja cancelar a reserva de ${schedule[key].professorName} (${schedule[key].numPCs} PCs)?`)) {
+                    availableComputers += schedule[key].numPCs;
+                    delete schedule[key];
+                    localStorage.setItem('schedule', JSON.stringify(schedule));
+                    cell.textContent = "";
+                    cell.classList.remove("reserved");
+                    cell.classList.add("available");
+                    cell.addEventListener("click", handleCellClick);
+                }
+            } else {
+                alert('Faça login para alterar as reservas.');
+                document.getElementById('loginModal').style.display = 'flex';
+            }
+        }
+
+        function showReserveModal() {
+            if (selectedSlots.length === 0) {
+                alert("Por favor, selecione pelo menos um horário para reservar.");
+                return;
+            }
+            document.getElementById('reserveModal').style.display = 'flex';
+        }
+
+        function showIndividualReserveModal() {
+            document.getElementById('individualReserveModal').style.display = 'flex';
+        }
+
+        function confirmReservations() {
+            const professorName = document.getElementById("professorNameModal").value;
+            const numPCs = parseInt(document.getElementById("numPCsModal").value);
+
+            if (professorName === "" || isNaN(numPCs) || numPCs <= 0 || numPCs > availableComputers) {
+                alert("Por favor, insira detalhes válidos para a reserva.");
+                return;
+            }
+
+            selectedSlots.forEach(slot => {
+                if (!schedule[slot.key]) {
+                    schedule[slot.key] = { professorName, numPCs };
+                    const cell = document.querySelector(`td[data-day='${slot.day}'][data-time='${slot.time}']`);
+                    cell.textContent = `${professorName} (${numPCs} PCs)`;
+                    cell.classList.remove("selected", "available");
+                    cell.classList.add("reserved");
+                    cell.removeEventListener("click", handleCellClick);
+                    cell.addEventListener("dblclick", handleCellDoubleClick);
+                    availableComputers -= numPCs;
+                }
+            });
+
+            localStorage.setItem('schedule', JSON.stringify(schedule));
+            document.getElementById('reserveModal').style.display = 'none';
+            updateReservationList();
+            selectedSlots = [];
+        }
+
+        function confirmIndividualReservation() {
+            const professorName = document.getElementById("individualProfessorNameModal").value;
+            const numPCs = parseInt(document.getElementById("individualNumPCsModal").value);
+            const day = document.getElementById("individualDayModal").value;
+            const time = document.getElementById("individualTimeModal").value;
+            const key = `${day} ${time}`;
+
+            if (professorName === "" || isNaN(numPCs) || numPCs <= 0 || numPCs > availableComputers) {
+                alert("Por favor, insira detalhes válidos para a reserva.");
+                return;
+            }
+
+            if (schedule[key]) {
+                alert("Este horário já está reservado.");
+                return;
+            }
+
+            schedule[key] = { professorName, numPCs };
+            availableComputers -= numPCs;
+            localStorage.setItem('schedule', JSON.stringify(schedule));
+            const cell = document.querySelector(`td[data-day='${day}'][data-time='${time}']`);
+            cell.textContent = `${professorName} (${numPCs} PCs)`;
+            cell.classList.remove("available");
+            cell.classList.add("reserved");
+            cell.removeEventListener("click", handleCellClick);
+            cell.addEventListener("dblclick", handleCellDoubleClick);
+
+            document.getElementById('individualReserveModal').style.display = 'none';
+            updateReservationList();
+        }
+
+        function closeReserveModal() {
+            document.getElementById('reserveModal').style.display = 'none';
+        }
+
+        function closeIndividualReserveModal() {
+            document.getElementById('individualReserveModal').style.display = 'none';
+        }
+
+        function showResetModal() {
+            document.getElementById('resetModal').style.display = 'flex';
+        }
+
+        function resetLogin() {
+            const username = document.getElementById('resetUsername').value;
+            const password = document.getElementById('resetPassword').value;
+
+            if (adminUsers[username] && adminUsers[username] === password) {
+                resetReservations();
+                document.getElementById('resetModal').style.display = 'none';
+            } else {
+                alert('Usuário ou senha incorretos.');
+            }
+        }
+
+        function resetReservations() {
+            availableComputers = totalComputers;
+            localStorage.removeItem('schedule');
+            Object.keys(schedule).forEach(key => delete schedule[key]);
+            document.querySelectorAll('.reserved').forEach(cell => {
+                cell.textContent = "";
+                cell.classList.remove("reserved");
+                cell.classList.add("available");
+                cell.addEventListener("click", handleCellClick);
+            });
+            updateReservationList();
+        }
+
+        function updateReservationList() {
+            const reservationList = document.getElementById('reservationList');
+            reservationList.innerHTML = "";
+            Object.keys(schedule).forEach(key => {
+                const { professorName, numPCs } = schedule[key];
+                const [day, time] = key.split(' ');
+                const li = document.createElement('li');
+                li.textContent = `${day} ${time}: Professor ${professorName} - ${numPCs} PCs`;
+                reservationList.appendChild(li);
+            });
+        }
+
+        function generatePDF() {
+            const { jsPDF } = window.jspdf;
+            const doc = new jsPDF();
+            let y = 10;
+
+            doc.setFontSize(16);
+            doc.text("Lista de Reservas", 10, y);
+            y += 10;
+
+            Object.keys(schedule).forEach(key => {
+                const { professorName, numPCs } = schedule[key];
+                const [day, time] = key.split(' ');
+                doc.setFontSize(12);
+                doc.text(`${day} ${time}: Professor ${professorName} - ${numPCs} PCs`, 10, y);
+                y += 10;
+            });
+
+            doc.save("reservas.pdf");
+        }
+    </script>
+</body>
+</html>
