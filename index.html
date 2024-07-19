@@ -1,0 +1,29 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Sistema de Reserva de PCs</title>
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+    <div class="reservation-container">
+        <h1>Sistema de Reserva de PCs</h1>
+        <div class="reservation-form">
+            <label for="date">Data:</label>
+            <input type="date" id="date">
+            <label for="time">Hora:</label>
+            <input type="time" id="time" min="07:30" max="16:30">
+            <button onclick="makeReservation()">Reservar</button>
+            <button onclick="resetReservations()">Resetar Reservas</button>
+            <button onclick="editReservation()">Editar Reserva</button>
+            <button onclick="printReservations()">Imprimir Reservas</button>
+        </div>
+        <div class="reservation-list" id="reservation-list">
+            <h2>Lista de Reservas</h2>
+            <ul id="reservations"></ul>
+        </div>
+    </div>
+    <script src="script.js"></script>
+</body>
+</html>
